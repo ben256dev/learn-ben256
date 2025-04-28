@@ -1,5 +1,85 @@
 # Ebook App
 
+## CLI Testing Instructions
+
+First clone this repository:
+
+```bash
+git clone https://github.com/BSU-CS-208-Spring-2023/5-1-final-project-final-project-3.git
+```
+
+After navigating to the root of the directory, you can attempt to create an account with the CLI (courtesy of ChatGPT).
+
+```bash
+# get an idea for the commands
+./test/256cli.sh 
+```
+
+You should see
+
+```bash
+Usage: 256cli.sh <command> [arguments]
+
+Commands:
+  register <username> <password> <email>
+      Register a new user.
+
+  login <username> <password>
+      Login an existing user.
+
+  forgot-password <email>
+      Request a password reset link.
+
+  reset-password <token> <newpassword>
+      Reset password using the token.
+
+*THIS CLI WAS WRITTEN BY CHATGPT*
+```
+
+Try to run the account managment commands with your own username, password, and email
+
+```bash
+$ ./test/256cli.sh register <username> <password> <email>
+{
+  "success": true
+}
+
+It may take a moment before you see the success message. If you want, verify check that you *cannot* log in by skipping to the next step before verifying your email.
+
+Check your email and click the link to verify your email!
+
+Next try logging in.
+
+```bash
+$ ./test/256/cli.sh login <username> <password>
+{
+  "success": true,
+  "message": "Login successful"
+}
+```
+
+Try sending a password reset link.
+
+```bash
+$ ./test/256cli.sh forgot-password <email>
+{
+  "success": true
+}
+```
+
+You should receive a reset link at that email shortly, but unlike verifying your email, reseting your password requires you to provide more than just the token. Normally there would be a redirect to a frontend for this. But we will do it manually. To do this we have to find the reset email and copy the provided *link* not the link text. Your url will be formatted something like ``https://learn.ben256.com/a/reset-password?token=...``. Copy the big hex token in the token field and use it for the following command.
+
+```bash
+$ ./test/256cli.sh reset-password <reallybigtoken> <newpassword>
+{
+  "success": true
+}
+```
+
+Now try loging in like before with your old password and the command will return ``"success": false``. It will only succeed once you provide the new password.
+
+I will be clearing the database next week once the front-end is completed, so expect to have to re-do the registration process with the front-end instead.
+
 ## Project Spec
 
 Here are my primary goals with this project:
