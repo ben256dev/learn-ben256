@@ -1,0 +1,84 @@
+:root {
+    --atomic-tangerine:     #EB977D;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.sr-only {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+h1 {
+    background-color: #0f0;
+}
+
+p {
+    background-color: #00f;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    margin: auto;
+    max-width: 20rem;
+    box-sizing: border-box;
+    background-color: #f0f;
+    margin: auto;
+    padding: 4rem 6rem;
+    min-width: 500px;
+    min-height: 60%;
+}
+
+@media screen and (min-width: 800px) {
+    form {
+        width: 100%;
+        margin: 0;
+    }
+}
+form p {
+    font-size: 1.5em;
+}
+
+form h1 {
+    font-size: 3em;
+}
+
+form input {
+    width: 80%;
+    padding: 1rem 2rem;
+    margin: 1rem 0;
+    font-size: 1.5rem;
+    border-radius: 2rem;
+    display: block;
+}
+
+form button {
+    background: var(--atomic-tangerine);
+    border-radius: 3rem;
+    font-size: 2em;
+    line-height: 4rem;
+    white-space: nowrap;
+    padding: 1rem 2rem;
+    margin: 3rem auto 1rem;
+    border: none;
+}

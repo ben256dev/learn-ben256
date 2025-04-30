@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>Sign Up</title>
+	<link rel="stylesheet" type="text/css" href="style.css?ver=0">
+	<meta charset="utf-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+	
+<body>
+    <h1>Sign Up</h1>
+    <form action="/a/register" method="POST">
+        <div>
+            <label for="username">Username:</label><br>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <div>
+            <label for="email">Email:</label><br>
+            <input type="email" id="email" name="email" required>
+        </div>
+        <div>
+            <label for="password">Password:</label><br>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <div>
+            <label for="password_confirm">Confirm Password:</label><br>
+            <input type="password" id="password_confirm" name="password_confirm" required>
+        </div>
+        <div>
+            <button type="submit">Create Account</button>
+        </div>
+    </form>
+    <p>If you are a registered user <a href="/login.html">Log In</a></p>
+</body>
+
+</html>
