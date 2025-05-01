@@ -36,22 +36,18 @@ p {
 form {
     display: flex;
     flex-direction: column;
-    justify-content: center;
     align-items: center;
-    align-content: center;
-    margin: auto;
-    max-width: 20rem;
+    gap: 1.5rem;
+    width: clamp(300px, 90vw, 600px);
+    padding: clamp(2rem, 5vw, 4rem);
     box-sizing: border-box;
-    background-color: #f0f;
     margin: auto;
-    padding: 4rem 6rem;
-    min-width: 500px;
-    min-height: 60%;
+    background-color: #f0f;
 }
+
 
 @media screen and (min-width: 800px) {
     form {
-        width: 100%;
         margin: 0;
     }
 }
@@ -63,22 +59,48 @@ form h1 {
     font-size: 3em;
 }
 
-form input {
-    width: 80%;
-    padding: 1rem 2rem;
-    margin: 1rem 0;
-    font-size: 1.5rem;
-    border-radius: 2rem;
-    display: block;
+form input, form button, a.small {
+    font-size: clamp(1rem, 2vw, 1.5rem);
+    padding: clamp(.5rem, 3vw, 1rem);
+    border-radius: 1rem;
+    box-sizing: border-box;
 }
 
-form button {
+form input, form button, a.small, .forgot-wrapper {
+    width: 70%;
+    min-width: 200px;
+}
+
+form button, a.small {
     background: var(--atomic-tangerine);
-    border-radius: 3rem;
-    font-size: 2em;
     line-height: 4rem;
     white-space: nowrap;
-    padding: 1rem 2rem;
+    padding: clamp(.5rem, 3vw, 1rem 2rem);
     margin: 3rem auto 1rem;
     border: none;
+}
+
+a.forgot {
+    display: block;
+    text-align: right;
+    width: 70%;
+    margin: 0;
+    text-decoration: none;
+    color: #fff;
+}
+
+a.small {
+    font-size: 1em;
+    text-align: center;
+    text-decoration: none;
+    color: inherit;
+    line-height: 2rem;
+    padding: clamp(.25rem, 2vw, .5rem) 1rem;
+    margin: 3rem 0 0;
+    width: auto;
+}
+
+.forgot-wrapper button {
+    display: block;
+    margin: 0 auto;
 }
