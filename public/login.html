@@ -9,7 +9,7 @@
 </head>
 	
 <body>
-    <form action="/a/login" method="POST">
+    <form action="/a/login" method="POST" id="loginForm">
         <h1>Login</h1>
 
         <label class="sr-only" for="username">Username</label>
@@ -37,6 +37,40 @@
 
         <a href="/register.html" class="small">Sign Up</a></p>
     </form>
+
+    <script>
+        (async () => {
+            const key_pair = await crypto.subtle.generateKey(
+                { name: 'ECDH', namedCurve: 'P-256' },
+                true,
+                ['deriveKey']
+            );
+
+            const raw_pub = await crypto.subtle.exportKey('raw', key_pair.publicKey);
+            const pub_bytes = new Uint8Array(raw_pub);
+            const client_pub_hex = Array.from(pub_bytes)
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+
+            const form = document.getElementById('loginForm');
+            form.addEventListener('submit', e => {
+                e.preventDefault();
+
+                let inp = document.getElementById('client_pub');
+                if (!inp) {
+                    inp = document.createElement('input');
+                    inp.type = 'hidden';
+                    inp.name = 'client_pub';
+                    inp.id = 'client_pub';
+                    form.appendChild(inp);
+                }
+                inp.value = client_pub_hex;
+
+                form.submit();
+            });
+        })();
+    </script>
+
 </body>
 
 </html>
