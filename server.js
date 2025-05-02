@@ -6,9 +6,14 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const argon2 = require('argon2');
 
-require('dotenv').config();
+const redb = new redis({ path: '/var/run/redis/redis.sock' });
 
+const { create_ecdh, random_uuid } = require('crypto');
+
+require('dotenv').config();
 const app = express();
+
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 const PORT = process.env.PORT || 4000;
@@ -75,10 +80,13 @@ app.post('/a/register', async (req, res) => {
 });
 
 app.post('/a/login', async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, client_pub } = req.body;
 
     if (!username || !password)
         return res.status(400).json({ success: false, message: 'Username and password are required' });
+
+    if (!client_pub)
+        return res.status(400).json({ success: false, message: 'Client public key not provided' });
 
     try {
         const found_user = await user.findOne({ username });
@@ -92,7 +100,23 @@ app.post('/a/login', async (req, res) => {
         if (!is_password_valid)
             return res.status(400).json({ success: false, message: 'Invalid username or password' });
 
-        res.status(200).json({ success: true, message: 'Login successful' });
+        const ecdh = createECDH('secp256k1');
+        const server_pub = ecdh.generateKeys('hex');
+        const shared_secret = ecdh.computeSecret(Buffer.from(client_pub, 'hex')).toString('hex');
+
+        const session_id = randomUUID();
+        await redis.multi()
+            .set(`session:${session_id}`, shared_secret, 'EX', 24 * 60 * 60)
+            .sadd(`user_sessions:${found_user._id}`, session_id)
+            .expire(`user_sessions:${found_user._id}`, 24 * 60 * 60)
+            .exec();
+
+        res.status(200).json({
+            success: true,
+            message: 'Login successful',
+            server_pub: server_pub,
+            session_id
+        });
     } catch (err) {
         console.error('Error during login:', err);
         res.status(500).json({ success: false, message: 'Failed to login' });
@@ -136,7 +160,7 @@ async function send_email_verification(email, token) {
 }
 
 async function send_password_reset(email, token) {
-    const link = `https://learn.ben256.com/a/reset-password?token=${token}`;
+    const link = `https://learn.ben256.com/reset-password?token=${token}`;
     const mail_options = {
         from: '"ben256" <noreply@ben256.com>',
         to: email,
@@ -213,4 +237,3 @@ app.post('/a/reset-password', async (req, res) => {
 });
 
 //redis
-//const redb = new redis({ path: '/var/run/redis/redis.sock' });
