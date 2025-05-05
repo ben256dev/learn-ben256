@@ -41,33 +41,64 @@
     <script>
         (async () => {
             const key_pair = await crypto.subtle.generateKey(
-                { name: 'ECDH', named_curve: 'P-256' },
+                { name: 'ECDH', namedCurve: 'P-256' },
                 true,
-                ['deriveKey']
+                ['deriveBits']
             );
 
-            const raw_pub = await crypto.subtle.exportKey('raw', key_pair.publicKey);
-            const pub_bytes = new Uint8Array(raw_pub);
-            const client_pub_hex = Array.from(pub_bytes)
+            const form = document.getElementById('loginForm');
+            form.addEventListener('submit', async e => {
+                e.preventDefault();
+
+                const username = form.username.value
+                const password = form.password.value
+
+                const raw_pub = await crypto.subtle.exportKey('raw', key_pair.publicKey);
+                const client_pub_hex = Array.from(new Uint8Array(raw_pub))
                 .map(b => b.toString(16).padStart(2, '0'))
                 .join('');
 
-            const form = document.getElementById('loginForm');
-            form.addEventListener('submit', e => {
-                e.preventDefault();
+                const resp = await fetch('/a/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, client_pub: client_pub_hex })
+                });
 
-                let inp = document.getElementById('client_pub');
-                if (!inp) {
-                    inp = document.createElement('input');
-                    inp.type = 'hidden';
-                    inp.name = 'client_pub';
-                    inp.id = 'client_pub';
-                    form.appendChild(inp);
-                }
-                inp.value = client_pub_hex;
+                const data = await resp.json();
+                if (!data.success)
+                    return alert(data.message);
 
-                form.submit();
+                const server_pub_buf = hex_to_array_buffer(data.server_pub);
+                const server_key = await crypto.subtle.importKey(
+                    'raw',
+                    server_pub_buf,
+                    { name: 'ECDH', namedCurve: 'P-256' },
+                    false,
+                    []
+                );
+
+                const shared_bits = await crypto.subtle.deriveBits(
+                    { name: 'ECDH', public: server_key },
+                    key_pair.privateKey,
+                    256
+                );
+                const shared_hex = Array.from(new Uint8Array(shared_bits))
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join('');
+
+                localStorage.setItem('shared_secret', shared_hex);
+                window.location.href = '/';
             });
+
+            function hex_to_array_buffer(hex)
+            {
+                if (hex.length % 2 !== 0)
+                    throw new Error('Invalid hex string');
+                const bytes = new Uint8Array(hex.length / 2);
+                for (let i = 0; i < hex.length; i += 2)
+                    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+                return bytes.buffer;
+            }
         })();
     </script>
 

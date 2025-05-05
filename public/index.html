@@ -9,7 +9,30 @@
 </head>
 	
 <body>
-    <h1>Gaming</h1>
+  <div id="login-status">Checking login…</div>
+
+  <script>
+  (async () => {
+    const res = await fetch('/a/status');
+    const data = await res.json();
+    const status = document.getElementById('login-status');
+
+    if (!data.loggedIn) {
+      status.textContent = 'Not logged in';
+      window.location.replace("/login");
+      return;
+    }
+
+    // show username and active sessions
+    status.innerHTML = `
+      Logged in as <strong>${data.username}</strong>.<br>
+      Active sessions on this device:<br>
+      <ul>
+        ${data.sessions.map(s => `<li>${s}</li>`).join('')}
+      </ul>
+    `;
+  })();
+  </script>
 </body>
 
 </html>

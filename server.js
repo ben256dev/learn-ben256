@@ -5,16 +5,18 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const argon2 = require('argon2');
+const cookieparser = require('cookie-parser');
 
 const redb = new redis({ path: '/var/run/redis/redis.sock' });
 
-const { create_ecdh, random_uuid } = require('crypto');
+const { createECDH, randomUUID } = require('crypto');
 
 require('dotenv').config();
 const app = express();
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(cookieparser());
 
 const PORT = process.env.PORT || 4000;
 
@@ -100,27 +102,77 @@ app.post('/a/login', async (req, res) => {
         if (!is_password_valid)
             return res.status(400).json({ success: false, message: 'Invalid username or password' });
 
-        const ecdh = createECDH('secp256k1');
-        const server_pub = ecdh.generateKeys('hex');
+        const ecdh = createECDH('prime256v1');
+        const server_pub = ecdh.generateKeys('hex', 'uncompressed');
         const shared_secret = ecdh.computeSecret(Buffer.from(client_pub, 'hex')).toString('hex');
 
+        const device_id = req.cookies.device_id || randomUUID();
+        if (!req.cookies.device_id) {
+            res.cookie('device_id', device_id, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'Strict',
+                maxAge: 30 * 24 * 60 * 60 * 1000
+            });
+        }
+
+        const raw = await redb.hget(`user_devices:${found_user._id}`, device_id);
+        const sessions = raw ? JSON.parse(raw) : [];
+
         const session_id = randomUUID();
-        await redis.multi()
+        sessions.push(session_id);
+
+        await redb.multi()
             .set(`session:${session_id}`, shared_secret, 'EX', 24 * 60 * 60)
-            .sadd(`user_sessions:${found_user._id}`, session_id)
-            .expire(`user_sessions:${found_user._id}`, 24 * 60 * 60)
+            .set(`session_user:${session_id}`, found_user._id.toString(), 'EX', 24 * 60 * 60)
+            .hset(`user_devices:${found_user._id}`, device_id, JSON.stringify(sessions))
+            .expire(`user_devices:${found_user._id}`, 24 * 60 * 60)
             .exec();
 
-        res.status(200).json({
-            success: true,
-            message: 'Login successful',
-            server_pub: server_pub,
-            session_id
-        });
+        res
+            .cookie('session_id', session_id, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'Strict',
+                maxAge:  86400_000
+            })
+            .json({
+                success: true,
+                server_pub,
+                user: { username: found_user.username },
+                sessions
+            });
     } catch (err) {
         console.error('Error during login:', err);
         res.status(500).json({ success: false, message: 'Failed to login' });
     }
+});
+
+app.get('/a/status', async (req, res) => {
+    const { session_id, device_id } = req.cookies;
+    if (!session_id)
+        return res.json({ loggedIn: false });
+
+    const [ userId, secret ] = await Promise.all([
+        redb.get(`session_user:${session_id}`),
+        redb.get(`session:${session_id}`)
+    ]);
+
+    if (!userId || !secret)
+        return res.json({ loggedIn: false });
+
+    const raw = await redb.hget(`user_devices:${userId}`, device_id) || '[]';
+    const sessions = JSON.parse(raw);
+    if (sessions.length === 0)
+        return res.json({ loggedIn: false });
+
+    const u = await user.findById(userId, 'username');
+
+    return res.json({
+        loggedIn: true,
+        username: u.username,
+        sessions
+    });
 });
 
 //emailing
@@ -235,5 +287,3 @@ app.post('/a/reset-password', async (req, res) => {
 
     res.json({ success: true });
 });
-
-//redis
