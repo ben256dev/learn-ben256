@@ -1,10 +1,29 @@
 :root {
-    --atomic-tangerine:     #EB977D;
+    --dark-transparent:     #8881;
+
+	--night:                #161412;
+	--eerie-black:          #211E1C;
+	--battleship-gray:      #8A817C;
+	--silver:               #BCB8B1;
+	--isabelline:           #F4F3EE;
+	--atomic-tangerine:     #EB977D;
+	--platinum:             #ECEBE9;
+	--asparagus:            #63A46C;
+
+	--black-as-hell:        #0B0A09;
+	--literally-black:      #000;
+	--literally-white:      #fff;
+
+	--nav-bar-height:       20px;
 }
+ 
 
 html, body {
     height: 100%;
     margin: 0;
+    background: var(--night);
+    color: var(--silver);
+    font-family: "Roboto", sans-serif;
 }
 
 body {
@@ -26,11 +45,10 @@ body {
 }
 
 h1 {
-    background-color: #0f0;
+    font-family "Roboto Mono", monospace;
 }
 
 p {
-    background-color: #00f;
 }
 
 form {
@@ -39,10 +57,11 @@ form {
     align-items: center;
     gap: 1.5rem;
     width: clamp(300px, 90vw, 600px);
-    padding: clamp(2rem, 5vw, 4rem);
+    padding: 1rem clamp(2rem, 5vw, 4rem) 1rem;
     box-sizing: border-box;
     margin: auto;
-    background-color: #f0f;
+    background-color: var(--eerie-black);
+    border-radius: 3rem;
 }
 
 
@@ -57,6 +76,12 @@ form p {
 
 form h1 {
     font-size: 3em;
+}
+
+input {
+    color: var(--literally-white);
+    background-color: #ddd3;
+    border: none;
 }
 
 form input, form button, a.small {
@@ -93,7 +118,7 @@ a.small {
     font-size: 1em;
     text-align: center;
     text-decoration: none;
-    color: inherit;
+    color: var(--literally-black);
     line-height: 2rem;
     padding: clamp(.25rem, 2vw, .5rem) 1rem;
     margin: 3rem 0 0;
@@ -102,5 +127,5 @@ a.small {
 
 .forgot-wrapper button {
     display: block;
-    margin: 0 auto;
+    margin: 1rem auto 0;
 }
