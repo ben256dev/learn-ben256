@@ -6,6 +6,8 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const argon2 = require('argon2');
 const cookieparser = require('cookie-parser');
+const speakeasy = require('speakeasy');
+const qrcode = require('qrcode');
 
 const redb = new redis({ path: '/var/run/redis/redis.sock' });
 
@@ -41,6 +43,7 @@ const user_schema = new mongoose.Schema({
     verification_token: { type: String },
     reset_token: { type: String },
     reset_expiry: { type: Date },
+    mfa_secret: { type: String },
 });
 
 const user = mongoose.model('user', user_schema);
@@ -51,9 +54,11 @@ app.post('/a/register', async (req, res) => {
     if (!username || !password || !email)
         return res.status(400).json({ success: false, message: 'Username, password and email required' });
 
-    const existing_user = await user.findOne({ username });
-    if (existing_user)
+    if (await user.findOne({ username }))
         return res.status(400).json({ success: false, message: 'Username is already taken' });
+
+    if (await user.findOne({ email }))
+        return res.status(400).json({ success: false, message: 'Email already registered' });
 
     try
     {
@@ -82,7 +87,7 @@ app.post('/a/register', async (req, res) => {
 });
 
 app.post('/a/login', async (req, res) => {
-    const { username, password, client_pub } = req.body;
+    const { username, password, client_pub, otp } = req.body;
 
     if (!username || !password)
         return res.status(400).json({ success: false, message: 'Username and password are required' });
@@ -102,6 +107,34 @@ app.post('/a/login', async (req, res) => {
         if (!is_password_valid)
             return res.status(400).json({ success: false, message: 'Invalid username or password' });
 
+        //otp
+        const device_key = `user_devices:${found_user._id}`;
+        const total_devices = await redb.hlen(device_key);                    // how many devices exist
+        const incoming_devices = req.cookies.device_id;
+        const raw_sessions = await redb.hget(device_key, incoming_devices) || '[]';
+        const known_sessions   = JSON.parse(raw_sessions);
+        const is_new_device = !incoming_devices || known_sessions.length === 0;
+
+        if (total_devices > 0 && is_new_device) {
+          if (!otp) {
+            return res
+              .status(400)
+              .json({ success: false, message: 'MFA code required for new device' });
+          }
+          const otp_is_valid = speakeasy.totp.verify({
+            secret:   found_user.mfaSecret,
+            encoding: 'base32',
+            token:    otp,
+            window:   1
+          });
+          if (!otp_is_valid) {
+            return res
+              .status(400)
+              .json({ success: false, message: 'Invalid MFA code' });
+          }
+        }
+
+        //ecdh
         const ecdh = createECDH('prime256v1');
         const server_pub = ecdh.generateKeys('hex', 'uncompressed');
         const shared_secret = ecdh.computeSecret(Buffer.from(client_pub, 'hex')).toString('hex');
@@ -286,4 +319,94 @@ app.post('/a/reset-password', async (req, res) => {
     await found_user.save();
 
     res.json({ success: true });
+});
+
+async function require_auth(req, res, next) {
+    const session_id = req.cookies.session_id;
+    if (!session_id)
+        return res.status(401).json({ success: false, message: 'session_id cookie missing' });
+
+    const user_id = await redb.get(`session_user:${session_id}`);
+    if (!user_id)
+        return res.status(401).json({ success: false, message: 'Invalid session' });
+
+    req.user_id = user_id;
+    req.device_id = req.cookies.device_id;
+    next();
+}
+
+app.delete('/a/revoke-session/:session_id', require_auth, async (req, res) => {
+    const revoke_session_id = req.params.session_id;
+    if (!revoke_session_id)
+        return res.status(400).json({ success: false, message: 'session_id is required' });
+
+    const user_id = req.user_id;
+    const device_id = req.device_id;
+    const raw_sessions = await redb.hget(`user_devices:${user_id}`, device_id) || '[]';
+    const sessions = JSON.parse(raw_sessions);
+
+    if (sessions.length <= 1)
+        return res.status(400).json({ success: false, message: 'Cannot revoke device\'s sole session' });
+
+    if (!sessions.includes(revoke_session_id))
+        return res.status(403).json({ success: false, message: 'Session not found on this device' });
+
+    const updated_sessions = sessions.filter(s => s !== revoke_session_id);
+    await redb.multi()
+        .del(`session:${revoke_session_id}`)
+        .del(`session_user:${revoke_session_id}`)
+        .hset(`user_devices:${user_id}`, device_id, JSON.stringify(updated_sessions))
+        .exec();
+
+    res.json({ success: true, sessions: updated_sessions });
+});
+
+app.delete('/a/revoke-device/:device_id', require_auth, async (req, res) => {
+    const target_device_id = req.params.device_id;
+    if (!target_device_id)
+        return res.status(400).json({ success: false, message: 'device_id is required' });
+
+    const user_id = req.user_id;
+
+    const all_devices = await redb.hgetall(`user_devices:${user_id}`);
+    if (!Object.prototype.hasOwnProperty.call(all_devices, target_device_id))
+        return res.status(404).json({ success: false, message: 'Device not found' });
+
+    const raw_sessions = all_devices[target_device_id] || '[]';
+    const sessions_to_kill = JSON.parse(raw_sessions);
+    const multi = redb.multi();
+
+    sessions_to_kill.forEach(sid => {
+        multi.del(`session:${sid}`);
+        multi.del(`session_user:${sid}`);
+    });
+    multi.hdel(`user_devices:${user_id}`, target_device_id);
+    await multi.exec();
+
+    res.json({ success: true, device_id: target_device_id });
+});
+
+// MFA enable
+app.post('/a/enable-mfa', require_auth, async (req, res) => {
+    const found_user = await user.findById(req.user_id);
+    if (!found_user)
+        return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (found_user.mfa_secret)
+        return res.status(400).json({ success: false, message: 'MFA already enabled' });
+
+    const secret = speakeasy.generateSecret({
+        name: `YourApp (${found_user.username})`
+    });
+
+    await user.updateOne(
+        { _id: found_user._id },
+        { mfa_secret: secret.base32 }
+    );
+
+    qrcode.toDataURL(secret.otpauth_url, (err, uri) => {
+        if (err)
+            return res.status(500).send('Error generating QR');
+        res.json({ qr: uri });
+    });
 });

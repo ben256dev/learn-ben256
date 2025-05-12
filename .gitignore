@@ -74,6 +74,9 @@ typings/
 .env
 .env.test
 
+# bash aliases
+.alias
+
 # parcel-bundler cache (https://parceljs.org/)
 .parcel-cache
 
