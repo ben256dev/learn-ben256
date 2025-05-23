@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enable MFA</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <form id="enableMfaForm">
+        <h1>Enable Multi-Factor Authentication</h1>
+        <button type="submit">Enable MFA</button>
+    </form>
+
+    <div id="qrContainer" style="margin-top:1rem; display:none;">
+        <p>Scan this QR code with Google Authenticator:</p>
+        <img id="qrImage" alt="MFA QR Code" />
+    </div>
+
+    <script src="enable-mfa.js"></script>
+</body>
+</html>

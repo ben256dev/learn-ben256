@@ -30,77 +30,28 @@
             required
         >
 
+        <label class="sr-only" for="otp">Authenticator code</label>
+        <input
+            type="text"
+            id="otp"
+            name="otp"
+            placeholder="123 456"
+            pattern="\d{6}"
+            style="display: none;"
+        >
+
+        <div id="error-message" class="animate__animated animate__headShake error_message" style="display: none">poop</div>
+
         <div class="forgot-wrapper">
             <button type="submit">Login</button>
             <a href="/forgot-password" class="forgot">Forgot password?</a>
         </div>
 
+
         <a href="/register.html" class="small">Sign Up</a></p>
     </form>
 
-    <script>
-        (async () => {
-            const key_pair = await crypto.subtle.generateKey(
-                { name: 'ECDH', namedCurve: 'P-256' },
-                true,
-                ['deriveBits']
-            );
-
-            const form = document.getElementById('loginForm');
-            form.addEventListener('submit', async e => {
-                e.preventDefault();
-
-                const username = form.username.value
-                const password = form.password.value
-
-                const raw_pub = await crypto.subtle.exportKey('raw', key_pair.publicKey);
-                const client_pub_hex = Array.from(new Uint8Array(raw_pub))
-                .map(b => b.toString(16).padStart(2, '0'))
-                .join('');
-
-                const resp = await fetch('/a/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password, client_pub: client_pub_hex })
-                });
-
-                const data = await resp.json();
-                if (!data.success)
-                    return alert(data.message);
-
-                const server_pub_buf = hex_to_array_buffer(data.server_pub);
-                const server_key = await crypto.subtle.importKey(
-                    'raw',
-                    server_pub_buf,
-                    { name: 'ECDH', namedCurve: 'P-256' },
-                    false,
-                    []
-                );
-
-                const shared_bits = await crypto.subtle.deriveBits(
-                    { name: 'ECDH', public: server_key },
-                    key_pair.privateKey,
-                    256
-                );
-                const shared_hex = Array.from(new Uint8Array(shared_bits))
-                    .map(b => b.toString(16).padStart(2, '0'))
-                    .join('');
-
-                localStorage.setItem('shared_secret', shared_hex);
-                window.location.href = '/';
-            });
-
-            function hex_to_array_buffer(hex)
-            {
-                if (hex.length % 2 !== 0)
-                    throw new Error('Invalid hex string');
-                const bytes = new Uint8Array(hex.length / 2);
-                for (let i = 0; i < hex.length; i += 2)
-                    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
-                return bytes.buffer;
-            }
-        })();
-    </script>
+    <script type="module" src="login.js"></script>
 
 </body>
 

@@ -48,14 +48,10 @@ h1 {
     font-family "Roboto Mono", monospace;
 }
 
-p {
-}
-
 form {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.5rem;
     width: clamp(300px, 90vw, 600px);
     padding: 1rem clamp(2rem, 5vw, 4rem) 1rem;
     box-sizing: border-box;
@@ -63,7 +59,6 @@ form {
     background-color: var(--eerie-black);
     border-radius: 3rem;
 }
-
 
 @media screen and (min-width: 800px) {
     form {
@@ -84,9 +79,14 @@ input {
     border: none;
 }
 
+button:hover {
+    cursor: pointer;
+}
+
 form input, form button, a.small {
     font-size: clamp(1rem, 2vw, 1.5rem);
     padding: clamp(.5rem, 3vw, 1rem);
+    margin: clamp(.5rem, 3vw, 1rem);
     border-radius: 1rem;
     box-sizing: border-box;
 }
@@ -101,7 +101,7 @@ form button, a.small {
     line-height: 4rem;
     white-space: nowrap;
     padding: clamp(.5rem, 3vw, 1rem 2rem);
-    margin: 3rem auto 1rem;
+    margin: 2rem auto 1rem;
     border: none;
 }
 
@@ -128,4 +128,13 @@ a.small {
 .forgot-wrapper button {
     display: block;
     margin: 1rem auto 0;
+}
+
+.hidden {
+    display: none;
+}
+@import "https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css";
+.error_message {
+    color: red;
+    margin: 0.5rem 0;
 }

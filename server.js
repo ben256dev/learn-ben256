@@ -107,31 +107,30 @@ app.post('/a/login', async (req, res) => {
         if (!is_password_valid)
             return res.status(400).json({ success: false, message: 'Invalid username or password' });
 
-        //otp
+        //session info
+        const incoming_device = req.headers['x-device-id'];
         const device_key = `user_devices:${found_user._id}`;
-        const total_devices = await redb.hlen(device_key);                    // how many devices exist
-        const incoming_devices = req.cookies.device_id;
-        const raw_sessions = await redb.hget(device_key, incoming_devices) || '[]';
-        const known_sessions   = JSON.parse(raw_sessions);
-        const is_new_device = !incoming_devices || known_sessions.length === 0;
+        const device_id = incoming_device || randomUUID();
+        const raw = await redb.hget(device_key, device_id) || '[]';
+        const sessions = JSON.parse(raw);
+        const session_id = randomUUID();
+        const total_devices  = await redb.hlen(device_key);
+        const is_new_device  = !incoming_device || sessions.length === 0;
 
+        //otp
         if (total_devices > 0 && is_new_device) {
-          if (!otp) {
-            return res
-              .status(400)
-              .json({ success: false, message: 'MFA code required for new device' });
-          }
-          const otp_is_valid = speakeasy.totp.verify({
-            secret:   found_user.mfaSecret,
-            encoding: 'base32',
-            token:    otp,
-            window:   1
-          });
-          if (!otp_is_valid) {
-            return res
-              .status(400)
-              .json({ success: false, message: 'Invalid MFA code' });
-          }
+            if (!otp) {
+                return res.status(400).json({ success: false, message: 'MFA code required for new device' });
+            }
+            const otp_is_valid = speakeasy.totp.verify({
+                secret:   found_user.mfa_secret,
+                encoding: 'base32',
+                token:    otp,
+                window:   1
+            });
+            if (!otp_is_valid) {
+                return res.status(400).json({ success: false, message: 'Invalid MFA code' });
+            }
         }
 
         //ecdh
@@ -139,42 +138,24 @@ app.post('/a/login', async (req, res) => {
         const server_pub = ecdh.generateKeys('hex', 'uncompressed');
         const shared_secret = ecdh.computeSecret(Buffer.from(client_pub, 'hex')).toString('hex');
 
-        const device_id = req.cookies.device_id || randomUUID();
-        if (!req.cookies.device_id) {
-            res.cookie('device_id', device_id, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'Strict',
-                maxAge: 30 * 24 * 60 * 60 * 1000
-            });
-        }
-
-        const raw = await redb.hget(`user_devices:${found_user._id}`, device_id);
-        const sessions = raw ? JSON.parse(raw) : [];
-
-        const session_id = randomUUID();
         sessions.push(session_id);
 
         await redb.multi()
             .set(`session:${session_id}`, shared_secret, 'EX', 24 * 60 * 60)
             .set(`session_user:${session_id}`, found_user._id.toString(), 'EX', 24 * 60 * 60)
-            .hset(`user_devices:${found_user._id}`, device_id, JSON.stringify(sessions))
-            .expire(`user_devices:${found_user._id}`, 24 * 60 * 60)
+            .hset(device_key, device_id, JSON.stringify(sessions))
+            .expire(device_key, 24 * 60 * 60)
             .exec();
 
-        res
-            .cookie('session_id', session_id, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'Strict',
-                maxAge:  86400_000
-            })
-            .json({
-                success: true,
-                server_pub,
-                user: { username: found_user.username },
-                sessions
-            });
+        res.json({
+            success: true,
+            server_pub,
+            user: { username: found_user.username },
+            device_id,
+            session_id,
+            sessions
+        });
+
     } catch (err) {
         console.error('Error during login:', err);
         res.status(500).json({ success: false, message: 'Failed to login' });
@@ -322,16 +303,37 @@ app.post('/a/reset-password', async (req, res) => {
 });
 
 async function require_auth(req, res, next) {
-    const session_id = req.cookies.session_id;
-    if (!session_id)
-        return res.status(401).json({ success: false, message: 'session_id cookie missing' });
+    const session_id = req.headers['x-session-id'];
+    const timestamp  = req.headers['x-timestamp'];
+    const signature  = req.headers['x-signature'];
+    if (!session_id || !timestamp || !signature) {
+        return res.status(401).json({ success: false, message: 'Missing authentication headers' });
+    }
+
+    const secret = await redb.get(`session:${session_id}`);
+    if (!secret) {
+        return res.status(401).json({ success: false, message: 'Invalid session' });
+    }
+
+    const payload = `${timestamp}|${req.method}|${req.originalUrl}|${session_id}`;
+
+    const expected = crypto.createHmac('sha256', secret)
+                           .update(payload)
+                           .digest('hex');
+
+    const sig_buff = Buffer.from(signature, 'hex');
+    const exp_buff = Buffer.from(expected,  'hex');
+    if (sig_buff.length !== exp_buff.length ||
+        !crypto.timingSafeEqual(sig_buff, exp_buff)) {
+        return res.status(403).json({ success: false, message: 'Invalid signature' });
+    }
 
     const user_id = await redb.get(`session_user:${session_id}`);
-    if (!user_id)
-        return res.status(401).json({ success: false, message: 'Invalid session' });
-
+    if (!user_id) {
+        return res.status(401).json({ success: false, message: 'Session has no user' });
+    }
     req.user_id = user_id;
-    req.device_id = req.cookies.device_id;
+
     next();
 }
 

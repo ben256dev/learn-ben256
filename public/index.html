@@ -1,39 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-	<title>Gaming</title>
-	<link rel="stylesheet" type="text/css" href="style.css?ver=0">
-	<meta charset="utf-8"/>
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaming</title>
+    <link rel="stylesheet" href="style.css?ver=0">
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-	
 <body>
-  <div id="login-status">Checking login…</div>
+    <div id="login-status"><p>Checking login…</p></div>
+    <div>
+        <strong>Device ID:</strong>
+        <span id="device-id"></span>
+    </div>
+        <h3>Sessions on this device:</h3>
+        <ul id="sessions-list"></ul>
 
-  <script>
-  (async () => {
-    const res = await fetch('/a/status');
-    const data = await res.json();
-    const status = document.getElementById('login-status');
-
-    if (!data.loggedIn) {
-      status.textContent = 'Not logged in';
-      window.location.replace("/login");
-      return;
-    }
-
-    // show username and active sessions
-    status.innerHTML = `
-      Logged in as <strong>${data.username}</strong>.<br>
-      Active sessions on this device:<br>
-      <ul>
-        ${data.sessions.map(s => `<li>${s}</li>`).join('')}
-      </ul>
-    `;
-  })();
-  </script>
+        <script src="/login-status.js"></script>
 </body>
-
 </html>
 
